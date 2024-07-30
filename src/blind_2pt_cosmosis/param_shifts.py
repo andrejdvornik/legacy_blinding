@@ -5,6 +5,57 @@ from .io import DEFAULT_PARAM_RANGE
 
 logger = logging.getLogger("2pt_blinding")
 
+def draw_flat_param_shift_mult(seedstring='blinded', ranges=None, nblinds=1):
+    """
+    Given a string seed, pseudo-randomly draws shift in parameter space.
+
+    By default, draws random values for all the parameters with ranges defined
+    in the dictionary 'ranges'. Note:
+      - parameter names should match those used by cosmosis (see
+        DEFAULT_PARAM_RANGE dict for an example)
+      - ranges is a dictionary with parameter names as keys, the values are
+        tuples set up as (min,max). The parameter will be drawn from a flat
+        distribution between min and max.
+
+    Make sure any parameters that are shifted here have names matching
+    how cosmosis uses them, so that the code in the for loop starting with
+    'for parameter in pipeline.parameters' in run_cosmosis_togen_2ptdict
+    will work.
+    """
+    # sets the seed:
+    seedind = int(int(hashlib.md5(seedstring.encode('utf-8')).hexdigest(), 16) % 1.e8)
+    rng = np.random.default_rng(seed=seedind)
+
+    if ranges is None:
+        ranges = DEFAULT_PARAM_RANGE
+
+    # sorting makes sure it's always the same order
+    params2shift = sorted(ranges.keys())
+    Nparam = len(params2shift)
+    
+    # We want to select three parameter shift values, equally separated
+    # One of these values must be zero.
+    
+    # First pick three k values near (0, 0.5, 1.0)
+    shiftfrac = (rng.random((Nparam, nblinds)) * 0.1 + np.arange(0, nblinds/2, 0.5))
+    
+    # Shift k so that a random one of the values is k = 0
+    shiftfrac = shiftfrac - shiftfrac[:,rng.integers(nblinds),np.newaxis]
+    # Shuffle the shifts
+    rng.shuffle(shiftfrac, axis=1)
+    
+    # arrays between 0 and 1
+    
+    blind_dict = {}
+    mins, maxs = zip(*[ranges[k] for k in params2shift])
+    for i in range(nblinds):
+        dparams = (np.array(maxs) - np.array(mins)) * shiftfrac[:,i]
+        pdict = {param: value for param, value in zip(params2shift, dparams)}
+        pdict['SHIFTS'] = True
+        blind_dict[chr(i+65)] = pdict
+
+    return blind_dict
+
 def draw_flat_param_shift(seedstring='blinded', ranges=None):
     """
     Given a string seed, pseudo-randomly draws shift in parameter space.
@@ -22,6 +73,8 @@ def draw_flat_param_shift(seedstring='blinded', ranges=None):
     'for parameter in pipeline.parameters' in run_cosmosis_togen_2ptdict
     will work.
     """
+    if ranges == {}:
+        return {}
     # sets the seed:
     seedind = int(int(hashlib.md5(seedstring.encode('utf-8')).hexdigest(), 16) % 1.e8)
     np.random.seed(seedind)
@@ -106,7 +159,7 @@ def get_factordict(refdict,shiftdict,bftype='add'):
         end = key[key.rfind('_')+1:]
         #print(key,end)
         # don't take ratios or differences of angle/multipole info
-        if end in ['ell','l','theta','bins','angbins','binavg','mins','maxs']:
+        if end in ['ell','l','theta','bins','angbins','binavg','mins','maxs','{0}']:
             #print '    no change'
             factordict[key] = refdict[key]
         else:

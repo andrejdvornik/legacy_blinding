@@ -25,7 +25,8 @@ dependencies = [
     "pytest>=7.2.5",
     "argparse>=1.0",
     "pytest",
-    "pytest-cov", 
+    "pytest-cov",
+    "cryptograpy",
 ]
 keywords = ["desc", "python", "blinding", "cosmosis"]
 dynamic = ["version"]

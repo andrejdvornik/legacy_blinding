@@ -32,7 +32,7 @@ class SpectrumInterp(object):
     for if theory vector in datablock is very densely sampled, this 
     gets used to pick out values corresponding to desired angle positions
     """
-    def __init__(self,angle,spec,bounds_error=True):
+    def __init__(self,angle,spec,bounds_error=False):
         if np.all(spec>0):
             self.interp_func=interp1d(np.log(angle),np.log(spec),bounds_error=bounds_error,fill_value=-np.inf)
             self.interp_type='loglog'
@@ -82,7 +82,10 @@ def spectrum_array_from_block(block, section_name, types, xlabel='theta', bin_fo
     #This is the ell/theta values that have been calculated by cosmosis,
     # if bin averaging, these should match what's in the fits files (up to rounding)
     # if interpolating, angles will be more densely sampled than values in fits files.
-    theory_angle = block[section_name,xlabel]
+    if 'obs' in xlabel:
+        theory_angle = block[section_name,xlabel.format(1)]
+    else:
+        theory_angle = block[section_name,xlabel]
     n_angle = len(theory_angle) #whatevers in the block, length of array
     if is_binavg:
         theory_angle_edges = block[section_name,xlabel+'_edges'] #angle bin edges
@@ -111,6 +114,9 @@ def spectrum_array_from_block(block, section_name, types, xlabel='theta', bin_fo
             binlabel = bin_format.format(i+1,j+1)
             if block.has_value(section_name, binlabel):
                 cl = block[section_name, binlabel]
+                if 'obs' in xlabel:
+                    theory_angle = block[section_name,xlabel.format(i+1)]
+                    n_angle = len(theory_angle)
                 bin1.append(np.repeat(i + 1, n_angle))
                 bin2.append(np.repeat(j + 1, n_angle))
                 angles.append(theory_angle)
@@ -121,6 +127,9 @@ def spectrum_array_from_block(block, section_name, types, xlabel='theta', bin_fo
 
                 if is_auto and i!=j: #also store under flipped z bin labels
                     # this allows the script to work w fits files uing either convention
+                    if 'obs' in xlabel:
+                        theory_angle = block[section_name,xlabel.format(i+1)]
+                        n_angle = len(theory_angle)
                     bin1.append(np.repeat(j + 1, n_angle))
                     bin2.append(np.repeat(i + 1, n_angle))
                     value.append(cl)
@@ -162,7 +171,8 @@ def get_dictkey_for_2pttype(type1, type2):
         '-': 'shear_minus',
         'K': 'kappa',
         'R': 'real',
-        'F': 'fourier'
+        'F': 'fourier',
+        'O': 'onepoint',
     }
 
     if type1 in ("GPF", "GEF", "GBF", "GPR", "G+R", "G-R", "CKR", "GPF", "GEF", "GBF"):
@@ -170,6 +180,9 @@ def get_dictkey_for_2pttype(type1, type2):
         newtypes = ['_'.join([mapping[t[0]], mapping[t[1]], mapping[t[2]]]) for t in [type1, type2]]
         type1 = newtypes[0]
         type2 = newtypes[1]
+    if type1 == "O":
+        type1 = mapping[type1]
+        type2 = mapping[type2]
 
     try:
         section, xlabel, ylabel = type_table[(type1, type2)]
@@ -207,7 +220,19 @@ def get_twoptdict_from_pipeline_data(data):
             outdict[xkey + '_maxs'] = x_maxs
     
     return outdict
-
+    
+def remove_original_fits_file(origfitsfile, remove=False):
+    """
+    Removes the original fits file in order to not unblind ourselves.
+    """
+    if remove:
+        try:
+            os.remove(origfitsfile)
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+    return
+    
 def apply_2pt_blinding_and_save_fits(factordict, origfitsfile, outfname=None, outftag="_BLINDED", 
                                      justfname=False,bftype='add', storeseed='notsaved'):
     """
@@ -239,7 +264,7 @@ def apply_2pt_blinding_and_save_fits(factordict, origfitsfile, outfname=None, ou
     logger.info(f'bftype: {bftype}')
     # check whether data is already blinded and whether Nbins match
     for table in fits.open(origfitsfile): #look through tables to find 2ptdata
-        if table.header.get('2PTDATA'):
+        if table.header.get('2PTDATA') or table.header.get('1PTDATA'):
             if table.header.get('BLINDED'): #check for blinding
                 #if entry not there, or storing False -> not already blinded
                 raise ValueError('Data is already blinded!')
@@ -276,6 +301,26 @@ def apply_2pt_blinding_and_save_fits(factordict, origfitsfile, outfname=None, ou
                 elif bftype=='add':
                     #print 'adding!'
                     table.data['value'] += factor
+                else:
+                    raise ValueError('bftype {0:s} not recognized'.format(bftype))
+
+                #add new header entry to note that blinding has occurred, and what type
+                table.header['BLINDED'] = bftype
+                table.header['KEYWORD'] = storeseed
+                
+            if table.header.get('1PTDATA'):
+                factor = get_dictdat_tomatch_fitsdat_1pt(table, factordict)
+                nbins = table.header.get('NBINS')
+
+                if bftype=='mult' or bftype=='multNOCS':
+                    #print 'multiplying!'
+                    for i in range(nbins):
+                        table.data[f'value{i+1}'] *= factor[i]
+
+                elif bftype=='add':
+                    #print 'adding!'
+                    for i in range(nbins):
+                        table.data[f'value{i+1}'] += factor[i]
                 else:
                     raise ValueError('bftype {0:s} not recognized'.format(bftype))
 
@@ -320,6 +365,48 @@ def get_dictdat_tomatch_fitsdat(table, dictdata):
     yfromdict = get_data_from_dict_for_2pttype(type1, type2, bin1, bin2, xfromfits,
                                                dictdata, fits_is_binavg=fits_is_binavg,
                                                xfits_mins=xfromfits_mins, xfits_maxs=xfromfits_maxs)
+    
+    return yfromdict
+    
+def get_dictdat_tomatch_fitsdat_1pt(table, dictdata):
+    """
+    Given table of type fits.hdu.table.BinTableHDU containing 1pt data,
+    retrieves corresponding data from dictionary (blinding factors).
+
+    Expects that same z and theta bin numbers correspond to the same
+    z and theta values (i.e. matches up bin numbers but doesn't do
+    any interpolation). Theta values will be checked, but z values won't.
+    """
+    if not table.header.get('1PTDATA'):
+        logger.warning("Can't match dict data: this fits table doesn't contain 1pt data. Is named:",table.name)
+        return
+
+    type1 = table.header['QUANT1']
+    type2 = table.header['QUANT2']
+
+    #bin = table.data['BIN1'] #which bin is quant1 from?
+    nbins = table.header.get('NBINS')
+    
+    yfromdict = []
+    for i in range(nbins):
+        
+        # check for bin averaging
+        # Not yet implemented
+        #if "ANGLEMIN" in table.data.names:
+        #    fits_is_binavg = True
+        #    xfromfits_mins =  table.data['ANGLEMIN']
+        #    xfromfits_maxs =  table.data['ANGLEMAX']
+        #else:
+        fits_is_binavg = False
+        xfromfits_mins = None
+        xfromfits_maxs = None
+    
+        xfromfits = table.data[f'ANG{i+1}']
+        bin = (i+1)*np.ones_like(xfromfits, dtype=int)
+        
+        yfromdict.append(get_data_from_dict_for_2pttype(type1, type2, bin, bin, xfromfits,
+                                               dictdata, fits_is_binavg=fits_is_binavg,
+                                               xfits_mins=xfromfits_mins, xfits_maxs=xfromfits_maxs))
     
     return yfromdict
 

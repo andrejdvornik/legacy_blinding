@@ -1,5 +1,7 @@
 import argparse
 from . import __version__
+import pickle
+from cryptography.fernet import Fernet
 
 DEFAULT_PARAM_RANGE = {'cosmological_parameters--sigma_8_input':(0.834-3*.04,0.834+3*0.04),\
                        'cosmological_parameters--w':(-1.5,-.5)}
@@ -11,6 +13,44 @@ DEFAULT_PARAM_RANGE = {'cosmological_parameters--sigma_8_input':(0.834-3*.04,0.8
 class DictAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, eval(values))
+        
+
+"""
+Generate a key using Fernet.generate_key(), then store in file.
+with open('my_secret.key', 'wb') as f:
+    f.write(Fernet.generate_key())
+"""
+
+def generate_key(key_path_and_filename):
+    with open(key_path_and_filename, 'wb') as f:
+        f.write(Fernet.generate_key())
+    return
+
+def load_key(key_path=None):
+    if key_path:
+        with open(key_path, 'rb') as f:
+            return f.read()
+    else:
+        return None
+
+def load_pickle(file_path, key_path=None):
+    key = load_key(key_path)
+    if key:
+        fernet = Fernet(key)
+        with open(file_path, 'rb') as f:
+            return pickle.loads(fernet.decrypt(f.read()))
+    with open(file_path, 'rb') as f:
+        return pickle.load(f)
+
+def save_pickle(obj, file_path, key_path=None):
+    key = load_key(key_path)
+    if key:
+        fernet = Fernet(key)
+        with open(file_path, 'wb') as f:
+            f.write(fernet.encrypt(pickle.dumps(obj)))
+        return
+    with open(file_path, 'wb') as f:
+        pickle.dump(obj, f)
 
 def get_stored_seed_and_tag(args):
     """
@@ -135,6 +175,18 @@ def get_parser():
                         help="Dictionary of parameter shifts between quotes \". \nPlease use the parameter names" +
                         "as named in Cosmosis. \n>> Default is \"{'cosmological_parameters--sigma8_input':(0.834-3*.04,0.834"+
                         "+3*0.04),\ncosmological_parameters--w':(-1.5,-.5)}\"")
+                        
+    parser.add_argument('-b', '--remotely_blinded', action='store_true', required=False,
+                        default=False,
+                        help="If set, uses blinding scheme from an ecrypted dictionary set by a third person using the tool provided. Default is False.")
+    
+    parser.add_argument('--file_path', type=str, required=False,
+                        default=None,
+                        help="Blinded parameters file name")
+                        
+    parser.add_argument('--key_path', type=str, required=False,
+                        default=None,
+                        help="Blinding key file.")
     
     parser.add_argument('--seedinfname', action='store_true', required=False,
                         default=False,

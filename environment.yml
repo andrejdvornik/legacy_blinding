@@ -11,3 +11,4 @@ dependencies:
       - argparse
     - cosmosis 
     - cosmosis-build-standard-library
+    - cryptography
