@@ -52,8 +52,8 @@ def main():
             apply_2pt_blinding_and_save_fits(factor_dict, origfitsfile=args.origfits,
                                             outfname=args.outfname, outftag=f'_{blind}',
                                             bftype=args.bftype, storeseed=storeseed)
-                                            
-        #remove_original_fits_file(origfitsfile=args.origfits, remove=True)
+        
+        remove_original_fits_file(origfitsfile=args.origfits, remove=args.remove)
                 
     else:
         # Will need setting a seed, paramshifts, labels for output catalogues
@@ -79,7 +79,8 @@ def main():
         apply_2pt_blinding_and_save_fits(factor_dict, origfitsfile=args.origfits,
                                         outfname=args.outfname, outftag=tagstr,
                                         bftype=args.bftype, storeseed=storeseed)
-
+                                        
+        remove_original_fits_file(origfitsfile=args.origfits, remove=args.remove)
 
 if __name__ == '__main__':
     main()

@@ -179,6 +179,10 @@ def get_parser():
     parser.add_argument('-b', '--remotely_blinded', action='store_true', required=False,
                         default=False,
                         help="If set, uses blinding scheme from an ecrypted dictionary set by a third person using the tool provided. Default is False.")
+                        
+    parser.add_argument('-r', '--remove', action='store_true', required=False,
+                        default=False,
+                        help="If set, removes the original fits file when blinding. Default is False.")
     
     parser.add_argument('--file_path', type=str, required=False,
                         default=None,
