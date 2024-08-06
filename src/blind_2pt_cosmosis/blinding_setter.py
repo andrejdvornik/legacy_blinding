@@ -92,10 +92,8 @@ if __name__ == '__main__':
     
     params_shifts = draw_flat_param_shift_mult(seed, paramshifts, nblinds)
     
-    
-    print(f'A = {params_shifts["A"]}')
-    print(f'B = {params_shifts["B"]}')
-    print(f'C = {params_shifts["C"]}')
+    for key in params_shifts.keys():
+        print(f'{key} = {params_shifts[key]}')
     
     # Encrypt
     
@@ -114,10 +112,10 @@ if __name__ == '__main__':
     decoded = load_pickle(f'{Path.home()}/blinded_params_{today}.pkl', key_path=f'{Path.home()}/blinding_key_{today}.txt')
     
     print('Decoded dictionaries == original?')
+
+    for key in decoded.keys():
+        print(f'{key} = {params_shifts[key]}')
     
-    print(f'A = {decoded["A"]}')
-    print(f'B = {decoded["B"]}')
-    print(f'C = {decoded["C"]}')
     
     
 
