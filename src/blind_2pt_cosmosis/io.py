@@ -151,6 +151,10 @@ def get_parser():
     parser.add_argument('-s', '--seed', type=str, required=False, 
                         default="HARD_CODED_BLINDING",
                         help='string used to seed parameter shift selection')
+                        
+    parser.add_argument('-m', '--mode', type=str, required=False,
+                        default="cl",
+                        help="string used to determine the mode of 2pcf functions. Options are 'cl', 'xi', 'bp', 'co', default is 'cl'")
 
     parser.add_argument('-t', '--bftype', type=str, required=False,
                         default='add',

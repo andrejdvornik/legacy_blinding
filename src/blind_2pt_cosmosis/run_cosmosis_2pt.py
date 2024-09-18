@@ -72,7 +72,7 @@ def run_pipeline(pipeline):
     data = pipeline.run_parameters([])
     return data
 
-def run_cosmosis_togen_2ptdict(inifile, pdict={},
+def run_cosmosis_togen_2ptdict(inifile, mode, pdict={},
                                 nz_file=None, angles_file=None):
     """
     Runs cosmosis pipeline to generate 2pt functions.
@@ -95,7 +95,7 @@ def run_cosmosis_togen_2ptdict(inifile, pdict={},
     data = run_pipeline(pipeline)
     logger.debug("Passed run_pipeline.")
     
-    twoptdict = get_twoptdict_from_pipeline_data(data)
+    twoptdict = get_twoptdict_from_pipeline_data(data, mode)
     logger.debug(f"Passed get_twoptdict_from_pipeline_data!")
     
     return twoptdict

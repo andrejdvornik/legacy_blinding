@@ -18,8 +18,8 @@ def load_type_table():
     table_name = os.path.join(dirname, "cosmosis_files/type_table.txt")
     type_table = Table.read(table_name, format="ascii.commented_header")
     table = {}
-    for (type1, type2, section, x, y) in type_table:
-        table[(type1, type2)] = (section, x, y)
+    for (type1, type2, mode, section, x, y) in type_table:
+        table[(type1, type2, mode)] = (section, x, y)
     return table
 
 type_table = load_type_table()
@@ -73,10 +73,10 @@ def spectrum_array_from_block(block, section_name, types, xlabel='theta', bin_fo
     # but not for auto-correlations.
     is_auto = (types[0] == types[1])
     if block.has_value(section_name, "nbin"):
-        nbin_a = block[section_name, "nbin"]
+        nbin_a = int(block[section_name, "nbin"])
     else:
-        nbin_a = block[section_name, "nbin_a"]
-        nbin_b = block[section_name, "nbin_b"]
+        nbin_a = int(block[section_name, "nbin_a"])
+        nbin_b = int(block[section_name, "nbin_b"])
 
 
     #This is the ell/theta values that have been calculated by cosmosis,
@@ -154,7 +154,7 @@ def spectrum_array_from_block(block, section_name, types, xlabel='theta', bin_fo
 
     return angles, value, bins, is_binavg, angle_mins, angle_maxs
 
-def get_dictkey_for_2pttype(type1, type2):
+def get_dictkey_for_2pttype(type1, type2, mode):
     """
     Convert strings used in fits file to label spectra type in fits file to
     dictionary keys expected by this script's functions.
@@ -175,7 +175,8 @@ def get_dictkey_for_2pttype(type1, type2):
         'O': 'onepoint',
     }
 
-    if type1 in ("GPF", "GEF", "GBF", "GPR", "G+R", "G-R", "CKR", "GPF", "GEF", "GBF"):
+    #if type1 in ("GPF", "GEF", "GBF", "GPR", "G+R", "G-R", "CKR", "GPF", "GEF", "GBF"):
+    if type1 in ("GPF", "GEF", "GPR", "G+R", "G-R", "CKR", "GPF", "GEF"):
         # Translate short codes into longer strings
         newtypes = ['_'.join([mapping[t[0]], mapping[t[1]], mapping[t[2]]]) for t in [type1, type2]]
         type1 = newtypes[0]
@@ -185,7 +186,7 @@ def get_dictkey_for_2pttype(type1, type2):
         type2 = mapping[type2]
 
     try:
-        section, xlabel, ylabel = type_table[(type1, type2)]
+        section, xlabel, ylabel = type_table[(type1, type2, mode)]
         ykey = section
         xkey = f"{section}_{xlabel}"
     except KeyError:
@@ -193,7 +194,7 @@ def get_dictkey_for_2pttype(type1, type2):
     logger.debug("Returning: \txkey: {0:s}, ykey: {1:s}".format(xkey, ykey))
     return xkey, ykey
 
-def get_twoptdict_from_pipeline_data(data):
+def get_twoptdict_from_pipeline_data(data, mode):
     """
     Extract 2pt data from a cosmosis pipeline data object and return a dictionary
     with keys corresponding to the 2pt spectra types.
@@ -206,7 +207,7 @@ def get_twoptdict_from_pipeline_data(data):
 
     for types in type_keys:
         section, xlabel, binformat = type_table[types]
-        xkey, ykey = get_dictkey_for_2pttype(types[0], types[1])
+        xkey, ykey = get_dictkey_for_2pttype(types[0], types[1], mode)
         
         x, y, bins, is_binavg, x_mins, x_maxs = spectrum_array_from_block(data, section, types, xlabel, binformat)
         
@@ -233,7 +234,7 @@ def remove_original_fits_file(origfitsfile, remove=False):
                 raise
     return
     
-def apply_2pt_blinding_and_save_fits(factordict, origfitsfile, outfname=None, outftag="_BLINDED", 
+def apply_2pt_blinding_and_save_fits(factordict, origfitsfile, mode='xi', outfname=None, outftag="_BLINDED",
                                      justfname=False,bftype='add', storeseed='notsaved'):
     """
     Given the dictionary of one set of blinding factors,
@@ -288,7 +289,9 @@ def apply_2pt_blinding_and_save_fits(factordict, origfitsfile, outfname=None, ou
         #apply blinding factors
         for table in hdulist: #look all tables
             if table.header.get('2PTDATA'):
-                factor = get_dictdat_tomatch_fitsdat(table, factordict)
+                if (table.header['QUANT1'] == 'GBF') or (table.header['QUANT2'] == 'GBF'): # We currently cannot do b-modes
+                    continue
+                factor = get_dictdat_tomatch_fitsdat(table, factordict, mode)
 
                 if bftype=='mult' or bftype=='multNOCS':
                     #print 'multiplying!'
@@ -309,7 +312,7 @@ def apply_2pt_blinding_and_save_fits(factordict, origfitsfile, outfname=None, ou
                 table.header['KEYWORD'] = storeseed
                 
             if table.header.get('1PTDATA'):
-                factor = get_dictdat_tomatch_fitsdat_1pt(table, factordict)
+                factor = get_dictdat_tomatch_fitsdat_1pt(table, factordict, mode)
                 nbins = table.header.get('NBINS')
 
                 if bftype=='mult' or bftype=='multNOCS':
@@ -332,7 +335,7 @@ def apply_2pt_blinding_and_save_fits(factordict, origfitsfile, outfname=None, ou
         logger.info(f">>>> Stored blinded data in {outfname}")
     return outfname
 
-def get_dictdat_tomatch_fitsdat(table, dictdata):
+def get_dictdat_tomatch_fitsdat(table, dictdata, mode):
     """
     Given table of type fits.hdu.table.BinTableHDU containing 2pt data,
     retrieves corresponding data from dictionary (blinding factors).
@@ -362,13 +365,13 @@ def get_dictdat_tomatch_fitsdat(table, dictdata):
     
     xfromfits = table.data['ANG']
 
-    yfromdict = get_data_from_dict_for_2pttype(type1, type2, bin1, bin2, xfromfits,
+    yfromdict = get_data_from_dict_for_2pttype(type1, type2, mode, bin1, bin2, xfromfits,
                                                dictdata, fits_is_binavg=fits_is_binavg,
                                                xfits_mins=xfromfits_mins, xfits_maxs=xfromfits_maxs)
     
     return yfromdict
     
-def get_dictdat_tomatch_fitsdat_1pt(table, dictdata):
+def get_dictdat_tomatch_fitsdat_1pt(table, dictdata, mode):
     """
     Given table of type fits.hdu.table.BinTableHDU containing 1pt data,
     retrieves corresponding data from dictionary (blinding factors).
@@ -404,13 +407,13 @@ def get_dictdat_tomatch_fitsdat_1pt(table, dictdata):
         xfromfits = table.data[f'ANG{i+1}']
         bin = (i+1)*np.ones_like(xfromfits, dtype=int)
         
-        yfromdict.append(get_data_from_dict_for_2pttype(type1, type2, bin, bin, xfromfits,
+        yfromdict.append(get_data_from_dict_for_2pttype(type1, type2, mode, bin, bin, xfromfits,
                                                dictdata, fits_is_binavg=fits_is_binavg,
                                                xfits_mins=xfromfits_mins, xfits_maxs=xfromfits_maxs))
     
     return yfromdict
 
-def get_data_from_dict_for_2pttype(type1, type2, bin1fits, bin2fits, xfits, datadict,
+def get_data_from_dict_for_2pttype(type1, type2, mode, bin1fits, bin2fits, xfits, datadict,
                                    fits_is_binavg=True, xfits_mins=None, xfits_maxs=None):
     """
     Given info about 2pt data in a fits file (spectra type, z bin numbers,
@@ -418,7 +421,7 @@ def get_data_from_dict_for_2pttype(type1, type2, bin1fits, bin2fits, xfits, data
     e.g. blinding factors to match, with same array format and bin ordering
     as the fits file data.
     """
-    xkey,ykey = get_dictkey_for_2pttype(type1,type2)
+    xkey,ykey = get_dictkey_for_2pttype(type1,type2,mode)
 
     is_binavg = datadict[ykey+'_binavg']
     # this check is probably unnecessary, since the data is always bin averaged
