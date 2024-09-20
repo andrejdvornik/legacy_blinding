@@ -95,7 +95,7 @@ def run_cosmosis_togen_2ptdict(inifile, mode, pdict={},
     data = run_pipeline(pipeline)
     logger.debug("Passed run_pipeline.")
     
-    twoptdict = get_twoptdict_from_pipeline_data(data, mode)
+    twoptdict = get_twoptdict_from_pipeline_data(data)
     logger.debug(f"Passed get_twoptdict_from_pipeline_data!")
     
     return twoptdict

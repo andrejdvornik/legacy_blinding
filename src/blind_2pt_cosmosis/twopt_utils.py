@@ -175,8 +175,7 @@ def get_dictkey_for_2pttype(type1, type2, mode):
         'O': 'onepoint',
     }
 
-    #if type1 in ("GPF", "GEF", "GBF", "GPR", "G+R", "G-R", "CKR", "GPF", "GEF", "GBF"):
-    if type1 in ("GPF", "GEF", "GPR", "G+R", "G-R", "CKR", "GPF", "GEF"):
+    if type1 in ("GPF", "GEF", "GBF", "GPR", "G+R", "G-R", "CKR", "GPF", "GEF", "GBF"):
         # Translate short codes into longer strings
         newtypes = ['_'.join([mapping[t[0]], mapping[t[1]], mapping[t[2]]]) for t in [type1, type2]]
         type1 = newtypes[0]
@@ -194,7 +193,7 @@ def get_dictkey_for_2pttype(type1, type2, mode):
     logger.debug("Returning: \txkey: {0:s}, ykey: {1:s}".format(xkey, ykey))
     return xkey, ykey
 
-def get_twoptdict_from_pipeline_data(data, mode):
+def get_twoptdict_from_pipeline_data(data):
     """
     Extract 2pt data from a cosmosis pipeline data object and return a dictionary
     with keys corresponding to the 2pt spectra types.
@@ -207,7 +206,7 @@ def get_twoptdict_from_pipeline_data(data, mode):
 
     for types in type_keys:
         section, xlabel, binformat = type_table[types]
-        xkey, ykey = get_dictkey_for_2pttype(types[0], types[1], mode)
+        xkey, ykey = get_dictkey_for_2pttype(types[0], types[1], types[2])
         
         x, y, bins, is_binavg, x_mins, x_maxs = spectrum_array_from_block(data, section, types, xlabel, binformat)
         
@@ -289,8 +288,6 @@ def apply_2pt_blinding_and_save_fits(factordict, origfitsfile, mode='xi', outfna
         #apply blinding factors
         for table in hdulist: #look all tables
             if table.header.get('2PTDATA'):
-                if (table.header['QUANT1'] == 'GBF') or (table.header['QUANT2'] == 'GBF'): # We currently cannot do b-modes
-                    continue
                 factor = get_dictdat_tomatch_fitsdat(table, factordict, mode)
 
                 if bftype=='mult' or bftype=='multNOCS':
@@ -422,6 +419,12 @@ def get_data_from_dict_for_2pttype(type1, type2, mode, bin1fits, bin2fits, xfits
     as the fits file data.
     """
     xkey,ykey = get_dictkey_for_2pttype(type1,type2,mode)
+    
+    # If data not present in pipeline, skip. (for instance we don't predict B-modes or gamma_x)
+    try:
+        test = datadict[ykey]
+    except:
+        return 0.0
 
     is_binavg = datadict[ykey+'_binavg']
     # this check is probably unnecessary, since the data is always bin averaged

@@ -10,6 +10,7 @@ galaxy_shear_plus_real      galaxy_shear_plus_real       xi	shear_xi_plus       
 galaxy_shear_minus_real     galaxy_shear_minus_real      xi	shear_xi_minus      theta bin_{0}_{1}
 galaxy_position_real        galaxy_position_real         xi	galaxy_xi           theta bin_{0}_{1}
 galaxy_position_real	    galaxy_shear_plus_real	 xi	galaxy_shear_xi     theta bin_{0}_{1}
+galaxy_position_real	    galaxy_shear_minus_real	 xi	galaxy_shear_x_xi     theta bin_{0}_{1}
 galaxy_position_real        cmb_kappa_real               xi	galaxy_cmbkappa_xi  theta bin_{0}_{1}
 cmb_kappa_real              cmb_kappa_real	         xi	cmbkappa_xi         theta bin_{0}_{1}
 galaxy_shear_plus_real      cmb_kappa_real               xi	shear_cmbkappa_xi   theta bin_{0}_{1}
