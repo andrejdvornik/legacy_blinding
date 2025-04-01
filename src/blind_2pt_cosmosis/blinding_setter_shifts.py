@@ -1,8 +1,8 @@
 import datetime
 import argparse
 from pathlib import Path
-from blind_2pt_cosmosis.io import save_pickle, load_pickle, generate_key, load_key, DictAction, DEFAULT_PARAM_RANGE
-from blind_2pt_cosmosis.param_shifts import draw_flat_param_shift_mult
+from blind_2pt_cosmosis.io import save_pickle, load_pickle, generate_key, load_key, DictAction, DEFAULT_SHIFTS
+from blind_2pt_cosmosis.param_shifts import param_shift_user_defined
 import sys, os
 
 def print_both(args):
@@ -10,7 +10,7 @@ def print_both(args):
     with open(f'{Path.home()}/blinding_scheme_{today}.txt', 'a') as f:
         for out in [sys.stdout, f]:
             print(args, file=out)
-
+            
 def get_parser():
     """
     creates the parser to obtain the user command line input
@@ -62,17 +62,12 @@ def get_parser():
 
     parser.add_argument('-s', '--seed', type=str, required=False,
                         default="HARD_CODED_BLINDING",
-                        help='string used to seed parameter shift selection')
-
-    parser.add_argument('-n', '--nblinds', type=int, required=False,
-                        default=3,
-                        help="Number of blinds to use, one of which is the truth. Default is 3")
+                        help='string used to randomise the blinds')
     
     parser.add_argument('-p', '--paramshifts', action=DictAction, required=False,
-                        default=DEFAULT_PARAM_RANGE,
+                        default=DEFAULT_SHIFTS,
                         help="Dictionary of parameter shifts between quotes \". \nPlease use the parameter names" +
-                        "as named in Cosmosis. \n>> Default is \"{'cosmological_parameters--sigma8_input':(0.834-3*.04,0.834"+
-                        "+3*0.04),\ncosmological_parameters--w':(-1.5,-.5)}\"")
+                        "as named in Cosmosis. \n>> Default is \"{'cosmological_parameters--sigma8_input':[0, 0.2, -0.2],\ncosmological_parameters--w':[0.2, 0, 1.0]}\"")
     return parser
 
 if __name__ == '__main__':
@@ -93,14 +88,13 @@ if __name__ == '__main__':
     parser = get_parser()
     args = parser.parse_args()
     seed = args.seed
-    nblinds = args.nblinds
     paramshifts = args.paramshifts
     
-    print_both(f'Parameters and ranges in which parameter shifts will be drawn = {paramshifts}')
+    print_both(f'Parameters shifts = {paramshifts}')
     print_both(f'Random seed = {seed}')
     
     
-    params_shifts = draw_flat_param_shift_mult(seed, paramshifts, nblinds)
+    params_shifts = param_shift_user_defined(seed, paramshifts)
     
     for key in params_shifts.keys():
         print_both(f'{key} = {params_shifts[key]}')
@@ -108,8 +102,6 @@ if __name__ == '__main__':
     # Encrypt
     
     # First we generate a key and save it to a file
-    
-    today = datetime.date.today()
     
     generate_key(f'{Path.home()}/blinding_key_{today}.txt')
     save_pickle, load_pickle, generate_key, load_key

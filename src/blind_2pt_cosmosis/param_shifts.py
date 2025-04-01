@@ -1,9 +1,50 @@
 import hashlib
 import logging
 import numpy as np
-from .io import DEFAULT_PARAM_RANGE
+from .io import DEFAULT_PARAM_RANGE, DEFAULT_SHIFTS
 
 logger = logging.getLogger("2pt_blinding")
+
+
+def param_shift_user_defined(seedstring='blinded', shifts=None):
+    """
+    Given a string seed, shuffles the input shifts.
+
+    Note:
+      - parameter names should match those used by cosmosis (see
+        DEFAULT_PARAM_RANGE dict for an example)
+
+    Make sure any parameters that are shifted here have names matching
+    how cosmosis uses them, so that the code in the for loop starting with
+    'for parameter in pipeline.parameters' in run_cosmosis_togen_2ptdict
+    will work.
+    """
+    # sets the seed:
+    seedind = int(int(hashlib.md5(seedstring.encode('utf-8')).hexdigest(), 16) % 1.e8)
+    rng = np.random.default_rng(seed=seedind)
+
+    if shifts is None:
+        shifts = DEFAULT_SHIFTS
+
+    # sorting makes sure it's always the same order
+    sorted_dict = dict(sorted(shifts.items()))
+    params2shift = list(sorted_dict.keys())
+    Nparam = len(params2shift)
+    vals = np.array(list(sorted_dict.values()))
+    nblinds = len(vals[0])
+    if not all(len(item) == nblinds for item in vals):
+        raise ValueError('The number of shifts in different parameters need to be equal!')
+    
+    blind_dict = {}
+    for i in range(nblinds):
+        pdict = {}
+        for j in range(Nparam):
+            pdict[params2shift[j]] = vals[j,i]
+        pdict['SHIFTS'] = True
+        blind_dict[chr(i+65)] = pdict
+
+    return blind_dict
+
 
 def draw_flat_param_shift_mult(seedstring='blinded', ranges=None, nblinds=1):
     """

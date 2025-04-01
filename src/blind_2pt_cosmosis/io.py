@@ -5,6 +5,9 @@ from cryptography.fernet import Fernet
 
 DEFAULT_PARAM_RANGE = {'cosmological_parameters--sigma_8_input':(0.834-3*.04,0.834+3*0.04),\
                        'cosmological_parameters--w':(-1.5,-.5)}
+                       
+DEFAULT_SHIFTS = {'cosmological_parameters--sigma_8_input':[0.0, 0.1, -0.1],\
+                       'cosmological_parameters--w':[0.0, -0.01, 0.01]}
 
 # DEFAULT_PARAM_RANGE = {'cosmological_parameters--sigma_8_input':(-3*0.04, 3*0.04),\
 #                        'cosmological_parameters--w':(-0.5,0.5)}
