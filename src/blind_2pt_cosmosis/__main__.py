@@ -1,8 +1,9 @@
 import logging
-from .param_shifts import draw_flat_param_shift, get_factordict
+from .param_shifts import draw_flat_param_shift, get_factordict, get_factordict_sacc
 from .io import get_parser, get_stored_seed_and_tag, load_pickle
 from .run_cosmosis_2pt import run_cosmosis_togen_2ptdict
 from .twopt_utils import apply_2pt_blinding_and_save_fits, remove_original_fits_file
+from .sacc_utils import apply_2pt_blinding_and_save_sacc
 
 
 def main():
@@ -26,7 +27,7 @@ def main():
     # settings set by another code (blinding_setter.py)
     if args.remotely_blinded:
         encrypted_dict = load_pickle(args.file_path, args.key_path)
-        
+
         for i, blind in enumerate(encrypted_dict.keys()):
             # We read the parameter shifts from externally set encripted pickled file
             #params_shifts = draw_flat_param_shift(seed[i], paramshifts[i])
@@ -34,14 +35,18 @@ def main():
             params_shifts = encrypted_dict[blind]
     
             #get blinding factors
-            reff_dict = run_cosmosis_togen_2ptdict(inifile=args.ini, mode=args.mode) #args.ini is a template
+            reff_dict = run_cosmosis_togen_2ptdict(inifile=args.ini, mode=args.mode, sacc_data=args.origfits if args.sacc else None) #args.ini is a template
             logger.debug(f"Calculated Reference Dict")
             # FIXME: Add nz_file and angles_file to args
             shift_dict = run_cosmosis_togen_2ptdict(inifile=args.ini, mode=args.mode, pdict=params_shifts,
-                                                    nz_file=None, angles_file=None)
+                                                    nz_file=None, angles_file=None, 
+                                                    sacc_data=args.origfits if args.sacc else None)
             logger.debug(f"Calculated Shifted Dict")
             #gets the blinding factors data vectors
-            factor_dict = get_factordict(reff_dict, shift_dict, bftype=args.bftype)
+            if args.sacc:
+                factor_dict = get_factordict_sacc(reff_dict, shift_dict, bftype=args.bftype)
+            else:
+                factor_dict = get_factordict(reff_dict, shift_dict, bftype=args.bftype)
             logger.debug(f"Calculated Blinded Data Vectors")
         
             # Gets some I/O information
@@ -49,7 +54,12 @@ def main():
         
             # applies the shift to the 2pt data-vector:
             #FIXME: This function is also saving the file, we want to split it!
-            apply_2pt_blinding_and_save_fits(factor_dict, origfitsfile=args.origfits, mode=args.mode,
+            if args.sacc:
+                apply_2pt_blinding_and_save_sacc(factor_dict, origsaccfile=args.origfits, mode=args.mode,
+                                            outfname=args.outfname, outftag=f'_{blind}',
+                                            bftype=args.bftype, storeseed=storeseed)
+            else:
+                apply_2pt_blinding_and_save_fits(factor_dict, origfitsfile=args.origfits, mode=args.mode,
                                             outfname=args.outfname, outftag=f'_{blind}',
                                             bftype=args.bftype, storeseed=storeseed)
         
@@ -61,14 +71,18 @@ def main():
         logger.debug(f"Parameters shifts are: {params_shifts}")
     
         #get blinding factors
-        reff_dict = run_cosmosis_togen_2ptdict(inifile=args.ini, mode=args.mode) #args.ini is a template
+        reff_dict = run_cosmosis_togen_2ptdict(inifile=args.ini, mode=args.mode, sacc_data=args.origfits if args.sacc else None) #args.ini is a template
         logger.debug(f"Calculated Reference Dict")
         # FIXME: Add nz_file and angles_file to args
         shift_dict = run_cosmosis_togen_2ptdict(inifile=args.ini, mode=args.mode, pdict=params_shifts,
-                                                nz_file=None, angles_file=None)
+                                                nz_file=None, angles_file=None, 
+                                                sacc_data=args.origfits if args.sacc else None)
         logger.debug(f"Calculated Shifted Dict")
         #gets the blinding factors data vectors
-        factor_dict = get_factordict(reff_dict, shift_dict, bftype=args.bftype)
+        if args.sacc:
+            factor_dict = get_factordict_sacc(reff_dict, shift_dict, bftype=args.bftype)
+        else:
+            factor_dict = get_factordict(reff_dict, shift_dict, bftype=args.bftype)
         logger.debug(f"Calculated Blinded Data Vectors")
     
         # Gets some I/O information
@@ -76,10 +90,14 @@ def main():
     
         # applies the shift to the 2pt data-vector:
         #FIXME: This function is also saving the file, we want to split it!
-        apply_2pt_blinding_and_save_fits(factor_dict, origfitsfile=args.origfits, mode=args.mode,
+        if args.sacc:
+            apply_2pt_blinding_and_save_sacc(factor_dict, origsaccfile=args.origfits, mode=args.mode,
                                         outfname=args.outfname, outftag=tagstr,
                                         bftype=args.bftype, storeseed=storeseed)
-                                        
+        else:
+            apply_2pt_blinding_and_save_fits(factor_dict, origfitsfile=args.origfits, mode=args.mode,
+                                        outfname=args.outfname, outftag=tagstr,
+                                        bftype=args.bftype, storeseed=storeseed)            
         remove_original_fits_file(origfitsfile=args.origfits, remove=args.remove)
 
 if __name__ == '__main__':

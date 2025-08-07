@@ -209,4 +209,7 @@ def get_parser():
     
     parser.add_argument("--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
                         default="INFO", help="Specify the logging level: DEBUG, INFO, WARNING, ERROR, or CRITICAL. Default is INFO.")
+
+    parser.add_argument("--sacc", action='store_true', required=False,
+                        default=False, help="If the input file is in sacc format or not.")
     return parser

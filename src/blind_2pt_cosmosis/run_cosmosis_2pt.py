@@ -3,6 +3,7 @@ import logging
 from cosmosis.runtime.config import Inifile
 from cosmosis.runtime.pipeline import LikelihoodPipeline
 from .twopt_utils import get_twoptdict_from_pipeline_data
+from .sacc_utils import get_twoptdict_from_pipeline_data_sacc
 from .param_shifts import apply_parameter_shifts
 
 logger = logging.getLogger("2pt_blinding")
@@ -73,7 +74,7 @@ def run_pipeline(pipeline):
     return data
 
 def run_cosmosis_togen_2ptdict(inifile, mode, pdict={},
-                                nz_file=None, angles_file=None):
+                                nz_file=None, angles_file=None, sacc_data=None):
     """
     Runs cosmosis pipeline to generate 2pt functions.
     """
@@ -95,7 +96,10 @@ def run_cosmosis_togen_2ptdict(inifile, mode, pdict={},
     data = run_pipeline(pipeline)
     logger.debug("Passed run_pipeline.")
     
-    twoptdict = get_twoptdict_from_pipeline_data(data)
+    if sacc_data:
+        twoptdict = get_twoptdict_from_pipeline_data_sacc(data, sacc_data)
+    else:
+        twoptdict = get_twoptdict_from_pipeline_data(data)
     logger.debug(f"Passed get_twoptdict_from_pipeline_data!")
     
     return twoptdict

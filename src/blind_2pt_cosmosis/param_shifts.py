@@ -213,3 +213,39 @@ def get_factordict(refdict,shiftdict,bftype='add'):
             else:
                 raise ValueError('In get_factordict: blinding factor type not recognized')
     return factordict
+
+def get_factordict_sacc(refdict,shiftdict,bftype='add'):
+    """
+    Given two point arrays for reference and shifted cosmology,
+    returns array of blinding factors.
+
+    Parameters
+    ----------
+    refdict : ndarray
+        Array of reference cosmology 2pt functions.
+    shiftdict : ndarray
+        Array of shifted cosmology 2pt functions.
+    bftype : str, optional
+        What kind of blinding factor is it?
+        'add' : bf = - ref + shift
+        'mult': bf = shift/ref
+        'multNOCS': bf = shift/ref, but with no cosmic shear
+            (i.e. no E-mode or B-mode shear)
+        Default is 'add'.
+
+    Returns
+    -------
+    factordict : ndarray
+        Array of blinding factors.
+    """
+
+    
+    if bftype=='mult' or bftype=='multNOCS':
+        logger.debug('    dividing!')
+        factordict = shiftdict / refdict
+    elif bftype=='add':
+        logger.debug('    adding!')
+        factordict = shiftdict - refdict
+    else:
+        raise ValueError('In get_factordict: blinding factor type not recognized')
+    return factordict
